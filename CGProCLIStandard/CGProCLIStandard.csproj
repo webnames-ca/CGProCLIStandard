@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>netstandard2.0</TargetFramework>
+	</PropertyGroup>
+	
+	<ItemGroup>
+		<PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
+		<PackageReference Include="Antlr4BuildTasks" Version="12.8.0" />
+		<PackageReference Include="HtmlTextWriter" Version="3.0.1" />
+		<PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.0" />
+		<PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.0" />
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+		<PackageReference Include="System.Data.DataSetExtensions" Version="4.5.0" />
+		<PackageReference Include="System.Runtime.Caching" Version="8.0.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Remove="CGProCLI.g4" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Antlr4 Include="CGProCLI.g4">
+			<Package>CGProCLI.CGProCLI</Package>
+			<Visitor>true</Visitor>
+			<Error>false</Error>
+			<Listener>true</Listener>
+		</Antlr4>
+	</ItemGroup>
+	
+</Project>

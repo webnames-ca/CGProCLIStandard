@@ -1,0 +1,21 @@
+﻿# Build results 
+**/bin/**
+obj/
+PreCompiledWeb/
+
+# Published .NET Core Web Application Projects
+**/PublishedSite/**
+
+# NPM/Node.js packages are generally downloaded on each build and don't need to be in source control
+**/www.webnames.ca/node_modules
+ 
+# User-specific files 
+*.suo
+*.wsuo
+*.user
+ 
+# Visual Studio
+*.vsidx
+slnx.sqlite
+.vs/
+/packages
