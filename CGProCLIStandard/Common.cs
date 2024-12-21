@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Linq;
 using System.Net;
-using System.Runtime.Caching;
-using System.Data;
 using System.Collections.Generic;
 using System.Text;
 
@@ -544,26 +542,6 @@ namespace WNStandard
             }
 
             throw new ArgumentOutOfRangeException("address", "Address must be IPv4 or IPv4 mapped to IPv6: " + oIPAddress?.ToString());
-        }
-
-        /// <summary>
-        /// Gets the value specified by the cache key, or caches it and returns it based on the provided value constructor function,
-        /// in an atomic/thread-safe manner, with an absolute expiration after the specified number of minutes and a NotRemovable (highest) priority.
-        /// </summary>
-        public static T GetOrAdd<T>(this MemoryCache oMemoryCache, string sCacheKey, int iMinutesToCache, Func<T> fValue)
-        {
-            var oNewValue = new Lazy<T>(fValue); // Only initialized when accessed.
-            var oOldValue = oMemoryCache.AddOrGetExisting(sCacheKey, oNewValue, new CacheItemPolicy() { AbsoluteExpiration = DateTimeOffset.Now.AddMinutes(iMinutesToCache), Priority = CacheItemPriority.NotRemovable }) as Lazy<T>; // Will return null if the item is newly added to the cache.
-
-            try
-            {
-                return (oOldValue ?? oNewValue).Value;
-            }
-            catch
-            {
-                oMemoryCache.Remove(sCacheKey);
-                throw;
-            }
         }
 
         public static IEnumerable<T> ContainsList<T, L>(this IEnumerable<T> table, IEnumerable<L> list, Func<T, L> key)
