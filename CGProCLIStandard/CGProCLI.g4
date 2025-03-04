@@ -34,13 +34,14 @@ THE SOFTWARE.
 // - Single (//) and multi-line (/* ... */) comments. See https://support.mailspec.com/en/guides/communigate-pro-manual/textual-representation.
 // - Embedded <xml/>. See https://support.mailspec.com/en/guides/communigate-pro-manual/xml-objects.
 // - Other arbitrary objects. See https://support.mailspec.com/en/guides/communigate-pro-manual/atomic-objects#atomic-objects_other-objects.
-// - Binary data blocks. See https://support.mailspec.com/en/guides/communigate-pro-manual/atomic-objects#atomic-objects_datablocks.
 
 grammar CGProCLI;
 
 cliData: Whitespace* cliObject? ( Whitespace+ cliObject )* Whitespace* EOF; // Basic structure is a space-separated list of objects with optional surrounding whitespace.
 
-cliObject: cliString | CLIInteger | CLINull | CLIIPAddress | cliArray | cliDictionary;
+cliObject: cliString | CLIInteger | CLINull | CLIIPAddress | cliDataBlock | cliArray | cliDictionary;
+
+cliDataBlock: CLIDataBlock;
 
 cliString: UnquotedString | QuotedString;
 
@@ -50,9 +51,14 @@ cliArray:
 	
 cliDictionary: 
 	// Example: {Key1=(Elem1,Elem2);  "$Key2" ={Sub1="XXX 1"; Sub2=X245 ;};}
-	'{' ( Whitespace* cliString Whitespace* '=' Whitespace* cliObject Whitespace* ';' Whitespace* )* '}';
-	
+	'{' ( Whitespace* cliString Whitespace* '=' Whitespace* cliObject Whitespace* ';' Whitespace* )* '}' ;
+
 Whitespace: (' ' | '\t' | '\r' | '\n');
+
+CLIDataBlock:
+	// Base64-encoded binary blob, whitespace ignored.
+	// Example: [DEAD BEEF +/1337/+ =]
+	'[' (AlphaNumericChar | '+' | '/' | '=' | Whitespace )* ']';
 
 UnquotedString:
 	// Called an "Atom" in the CGPro docs.
@@ -60,7 +66,7 @@ UnquotedString:
 	UnquotedStringSymbol+ |
 	'login OK, proceed'; // The '200 login OK, proceed' response doesn't parse properly due to the comma, so we allow it explicitly here.
 	
-UnquotedStringSymbol: UnicodeSymbol | '.' | '-' | '@' | '_' | '<' | '>' ;
+UnquotedStringSymbol: UnicodeSymbol | '.' | '-' | '@' | '_' | '<' | '>';
 
 UnicodeSymbol: AlphaNumericChar | '\u{000080}'..'\u{FFFFFF}';
 

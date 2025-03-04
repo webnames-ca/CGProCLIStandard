@@ -1,7 +1,7 @@
 ﻿/*
 MIT LICENSE
 
-Copyright (c) 2024 Webnames.ca Inc.
+Copyright (c) 2025 Webnames.ca Inc.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy 
 of this software and associated documentation files (the “Software”), to deal 
@@ -46,6 +46,8 @@ namespace CGProCLI
     /// <summary>
     /// Manages connections to the MailSPEC Communigate Pro API server via the CLI/PWD interface.
     /// See https://support.mailspec.com/en/guides/communigate-pro-manual/cli-access.
+    /// Provides methods for sending commands and parsing responses.
+    /// Depends on the ANTLR4 parser/grammar in CGProCLI.g4.
     /// </summary>
     public class Connection : IDisposable
     {
@@ -240,46 +242,150 @@ namespace CGProCLI
         {
             return SendCommand<Dictionary<string, object>, CGProCLIParser.CliDictionaryContext>
             (
-                $"GetAccountEffectiveSettings {sEmailAddress.CLIEncode()}",
+                sCommand: $"GetAccountEffectiveSettings {sEmailAddress.CLIEncode()}",
                 sDomainNameForLogging: sEmailAddress.GetDomainFromEmail(),
                 sCommandTypeForLogging: "GetAccountEffectiveSettings",
                 fConversion: d => d.ParseDictionary(),
                 aeAcceptableResponseCodes: new ResponseCodes[] { ResponseCodes.OK, ResponseCodes.OKDataProvided }
             );
         }
+        
+        public void EnableOrDisableDKIM(string sDomainName, bool bEnable)
+        {
+            SendCommand<CGProCLIParser.CliStringContext>
+            (
+                sCommand: $"UpdateDomainSettings {sDomainName.CLIEncode()} {new Dictionary<string, object> { { "DKIMenabled", bEnable ? "YES" : "NO" } }.EncodeObject()}",
+                sDomainNameForLogging: sDomainName,
+                sCommandTypeForLogging: "UpdateDomainSettings",
+                aeAcceptableResponseCodes: new ResponseCodes[] { ResponseCodes.OK }
+            );
+        }
+
         /// <summary>
-        /// Returns the effective settings of the specified domain.
+        /// Returns the DKIM key set on the specified domain, or null if not set or the domain does not exist.
         /// </summary>
-        public Dictionary<string, object> GetDomainEffectiveSettings(string sDomainName)
+        public byte[] GetDKIMKey(string sDomainName)
+        {
+            var oDKIMKey = GetDomainEffectiveSettings(sDomainName)?.GetValOrDefault("DKIMkey");
+            if (oDKIMKey == null || !(oDKIMKey is byte[]))
+            {
+                return null;
+            }
+            else
+            {
+                var abDKIMKey = (byte[])oDKIMKey;
+                return abDKIMKey.Length == 0 ? null : abDKIMKey;
+            }
+        }
+
+        public void SetDKIMKey(string sDomainName, byte[] abDKIMKey)
+        {
+            SendCommand<CGProCLIParser.CliStringContext>
+            (
+                sCommand: $"UpdateDomainSettings {sDomainName.CLIEncode()} {new Dictionary<string, object> { { "DKIMkey", abDKIMKey } }.EncodeObject()}",
+                sDomainNameForLogging: sDomainName,
+                sCommandTypeForLogging: "UpdateDomainSettings",
+                aeAcceptableResponseCodes: new ResponseCodes[] { ResponseCodes.OK }
+            );
+        }
+
+        /// <summary>
+        /// Returns any non-default settings on the specified domain, not including default settings.
+        /// Throws an exception if the domain is not found (to suppress and return null instead, pass bReturnNullIfNotFound: true).
+        /// </summary>
+        public Dictionary<string, object> GetDomainSettings(string sDomainName, bool bReturnNullIfNotFound = false)
         {
             return SendCommand<Dictionary<string, object>, CGProCLIParser.CliDictionaryContext>
             (
-                $"GetDomainEffectiveSettings {sDomainName.CLIEncode()}",
+                sCommand: $"GetDomainSettings {sDomainName.CLIEncode()}",
+                sDomainNameForLogging: sDomainName,
+                sCommandTypeForLogging: "GetDomainSettings",
+                fConversion: d => d.ParseDictionary(),
+                bThrowOnNullOrNonMatchingType: !bReturnNullIfNotFound,
+                aeAcceptableResponseCodes: new ResponseCodes[] { ResponseCodes.OK, ResponseCodes.OKDataProvided, ResponseCodes.UnknownDomain }
+            );
+        }
+
+        /// <summary>
+        /// Returns the effective settings on the specified domain, including all default settings.
+        /// Throws an exception if the domain is not found (to suppress and return null instead, pass bReturnNullIfNotFound: true).
+        /// </summary>
+        public Dictionary<string, object> GetDomainEffectiveSettings(string sDomainName, bool bReturnNullIfNotFound = false)
+        {
+            return SendCommand<Dictionary<string, object>, CGProCLIParser.CliDictionaryContext>
+            (
+                sCommand: $"GetDomainEffectiveSettings {sDomainName.CLIEncode()}",
                 sDomainNameForLogging: sDomainName,
                 sCommandTypeForLogging: "GetDomainEffectiveSettings",
+                fConversion: d => d.ParseDictionary(),
+                bThrowOnNullOrNonMatchingType: !bReturnNullIfNotFound,
+                aeAcceptableResponseCodes: new ResponseCodes[] { ResponseCodes.OK, ResponseCodes.OKDataProvided, ResponseCodes.UnknownDomain }
+            );
+        }
+
+        /// <summary>
+        /// Returns the list of Domain Queue Rules. The command produces an output - an array of the Queue Rules specified for the Domain.
+        /// </summary>
+        public List<object> GetDomainMailRules(string sDomainName)
+        {
+            return SendCommand<List<object>, CGProCLIParser.CliArrayContext>
+            (
+                $"GetDomainMailRules {sDomainName.CLIEncode()}",
+                sDomainNameForLogging: sDomainName,
+                sCommandTypeForLogging: "GetDomainMailRules",
+                fConversion: a => a.ParseArray(),
+                aeAcceptableResponseCodes: new ResponseCodes[] { ResponseCodes.OK, ResponseCodes.OKDataProvided }
+            );
+        }
+        /// <summary>
+        /// Returns the list of Domain Signal Rules. The command produces an output - an array of the Signal Rules specified for the Domain.
+        /// </summary>
+        public List<object> GetDomainSignalRules(string sDomainName)
+        {
+            return SendCommand<List<object>, CGProCLIParser.CliArrayContext>
+            (
+                $"GetDomainSignalRules {sDomainName.CLIEncode()}",
+                sDomainNameForLogging: sDomainName,
+                sCommandTypeForLogging: "GetDomainSignalRules",
+                fConversion: a => a.ParseArray(),
+                aeAcceptableResponseCodes: new ResponseCodes[] { ResponseCodes.OK, ResponseCodes.OKDataProvided }
+            );
+        }
+        /// <summary>
+        /// Returns the default Account settings for the specified Domain. The command produces an output - a dictionary with the default settings.
+        /// </summary>
+        public Dictionary<string, object> GetAccountDefaults(string sDomainName)
+        {
+            return SendCommand<Dictionary<string, object>, CGProCLIParser.CliDictionaryContext>
+            (
+                $"GetAccountDefaults {sDomainName.CLIEncode()}",
+                sDomainNameForLogging: sDomainName,
+                sCommandTypeForLogging: "GetAccountDefaults",
                 fConversion: d => d.ParseDictionary(),
                 aeAcceptableResponseCodes: new ResponseCodes[] { ResponseCodes.OK, ResponseCodes.OKDataProvided }
             );
         }
 
         /// <summary>
-        /// Returns the settings of the specified domain, or null if the domain does not exist.
+        /// Sets queue rules for the specified domain.
         /// </summary>
-        public Dictionary<string, object> GetDomainSettings(string sDomainName)
+        public void SetDomainMailRules(string sDomainName, string sRules)
         {
-            var oResult = SendAndParseResponse($"GetDomainSettings {sDomainName.CLIEncode()}",
-                                               sDomainNameForLogging: sDomainName,
-                                               sCommandTypeForLogging: "GetDomainSettings");
-
-            if (oResult.ResponseCode == (int)ResponseCodes.UnknownDomain)
-                return null;
-
-            if (oResult.ResponseCode != (int)ResponseCodes.OKDataProvided)
-                throw new Exception($"Unexpected response. sDomainName: {sDomainName}; oResult.RawData: {oResult.RawData}");
-
-            return oResult.Data.GetFirstSubObjectOrDefault<CGProCLIParser.CliDictionaryContext>().ParseDictionary();
+            SendCommand<CGProCLIParser.CliStringContext>($"SetDomainMailRules {sDomainName} {sRules}",
+                                             sDomainNameForLogging: sDomainName,
+                                             sCommandTypeForLogging: "SetDomainMailRules",
+                                             aeAcceptableResponseCodes: new ResponseCodes[] { ResponseCodes.OK });
         }
-
+        /// <summary>
+        /// Sets signal rules for the specified domain.
+        /// </summary>
+        public void SetDomainSignalRules(string sDomainName, string sRules)
+        {
+            SendCommand<CGProCLIParser.CliStringContext>($"SetDomainSignalRules {sDomainName} {sRules}",
+                                             sDomainNameForLogging: sDomainName,
+                                             sCommandTypeForLogging: "SetDomainSignalRules",
+                                             aeAcceptableResponseCodes: new ResponseCodes[] { ResponseCodes.OK });
+        }
         /// <summary>
         /// Renames the specified domain to the specified new domain name.
         /// </summary>
@@ -300,15 +406,30 @@ namespace CGProCLI
         }
 
         /// <summary>
-        /// Returns the rules in the specified account.
+        /// Returns the queue rules in the specified account.
         /// </summary>
-        public List<object> GetAccountRules(string sEmailAddress)
+        public List<object> GetAccountMailRules(string sEmailAddress)
         {
             return SendCommand<List<object>, CGProCLIParser.CliArrayContext>
             (
-                $"GetAccountRules {sEmailAddress.CLIEncode()}",
+                sCommand: $"GetAccountMailRules {sEmailAddress.CLIEncode()}",
                 sDomainNameForLogging: sEmailAddress.GetDomainFromEmail(),
-                sCommandTypeForLogging: "GetAccountRules",
+                sCommandTypeForLogging: "GetAccountMailRules",
+                fConversion: a => a.ParseArray(),
+                aeAcceptableResponseCodes: new ResponseCodes[] { ResponseCodes.OK, ResponseCodes.OKDataProvided }
+            );
+        }
+
+        /// <summary>
+        /// Sets the queue rules in the specified account.
+        /// </summary>
+        public List<object> SetAccountMailRules(string sEmailAddress)
+        {
+            return SendCommand<List<object>, CGProCLIParser.CliArrayContext>
+            (
+                sCommand: $"SetAccountMailRules {sEmailAddress.CLIEncode()}",
+                sDomainNameForLogging: sEmailAddress.GetDomainFromEmail(),
+                sCommandTypeForLogging: "SetAccountMailRules",
                 fConversion: a => a.ParseArray(),
                 aeAcceptableResponseCodes: new ResponseCodes[] { ResponseCodes.OK, ResponseCodes.OKDataProvided }
             );
@@ -317,11 +438,11 @@ namespace CGProCLI
         /// <summary>
         /// Returns the amount of storage used by the specified account, in bytes.
         /// </summary>
-        public Int64 GetAccountStorageUsed(string sEmailAddress)
+        public Int64 GetAccountStorageUsed(string sEmailAddress) 
         {
             return SendCommand<Int64, CGProCLIParser.CliStringContext>
             (
-                $"GetAccountInfo {sEmailAddress.CLIEncode()} Key StorageUsed",
+                sCommand: $"GetAccountInfo {sEmailAddress.CLIEncode()} Key StorageUsed",
                 sDomainNameForLogging: sEmailAddress.GetDomainFromEmail(),
                 sCommandTypeForLogging: "GetAccountInfo",
                 fConversion: (cliString) => Int64.Parse(cliString?.GetText().EmptyIfNothing()),
@@ -449,7 +570,7 @@ namespace CGProCLI
                     LogResponse(_oLastSubmissionLog, LogLevel.Error);
                     bSuppressLog = true;
                 }
-
+                
                 throw;
             }
             finally
@@ -502,7 +623,7 @@ namespace CGProCLI
         {
             public bool HadError;
             public string Name { get; set; }
-            public string Error { get; set; }
+            public string Error {  get; set; }
 
             public override void SyntaxError(TextWriter twOutput, IRecognizer oRecognizer, S tOffendingSymbol, int iLine, int iCol, string sMessage, RecognitionException oRecognitionException)
             {
@@ -511,7 +632,7 @@ namespace CGProCLI
                 base.SyntaxError(twOutput, oRecognizer, tOffendingSymbol, iLine, iCol, Error, oRecognitionException);
             }
         }
-
+        
         public void Disconnect()
         {
             if (_TcpClient.Connected)

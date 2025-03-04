@@ -46,7 +46,7 @@ namespace CGProCLIStandardTests_NETFramework
             var dicEffectiveSettings = oCGProCLI.GetAccountEffectiveSettings(sEmailAddress);
             Console.WriteLine($"{oCGProCLI.LastSubmissionLog.JsonSerializeForLogging()}\r\n{dicEffectiveSettings.JsonSerializeForLogging()}");
 
-            var aRules = oCGProCLI.GetAccountRules(sEmailAddress);
+            var aRules = oCGProCLI.GetAccountMailRules(sEmailAddress);
             Console.WriteLine($"{oCGProCLI.LastSubmissionLog.JsonSerializeForLogging()}\r\n{aRules.JsonSerializeForLogging()}");
 
             var dicDomainSettings = oCGProCLI.GetDomainSettings(sDomainName);

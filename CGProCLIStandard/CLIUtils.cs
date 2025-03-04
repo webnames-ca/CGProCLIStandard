@@ -1,7 +1,7 @@
 ﻿/*
 MIT LICENSE
 
-Copyright (c) 2024 Webnames.ca Inc.
+Copyright (c) 2025 Webnames.ca Inc.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy 
 of this software and associated documentation files (the “Software”), to deal 
@@ -38,9 +38,15 @@ using CGProCLI;
 
 namespace CGProCLI
 {
+    /// <summary>
+    /// Support class for the CGProCLI.Connection class to aid in communication with the MailSPEC Communigate Pro API server via the CLI/PWD interface.
+    /// See https://support.mailspec.com/en/guides/communigate-pro-manual/cli-access.
+    /// Provides methods for encoding/decoding/parsing objects.
+    /// Depends on the ANTLR4 parser/grammar in CGProCLI.g4.
+    /// </summary>
     public static class CLIUtils
     {
-        public const string s_REGEX_ATOM_CHARs = "[A-Za-z0-9@_-]";
+        public const string s_REGEX_ATOM_CHARs = @"[A-Za-z0-9@_\.\<\>-]";
 
         /// <summary>
         /// Encodes the specified string according to https://support.mailspec.com/en/guides/communigate-pro-manual/atomic-objects.
@@ -49,7 +55,7 @@ namespace CGProCLI
         public static string EncodeString(string s)
         {
             if (string.IsNullOrEmpty(s))
-                return "";
+                return "\"\"";
 
             var sbResult = new StringBuilder(s.Length);
 
@@ -186,7 +192,7 @@ namespace CGProCLI
         /// </summary>
         public static string GetDomainFromEmail(this string sEmailAddress)
         {
-            return (sEmailAddress?.Contains("@")).GetValueOrDefault() ? sEmailAddress.Substring(0, sEmailAddress.IndexOf("@")).ToLower() : null;
+            return (sEmailAddress?.Contains("@")).GetValueOrDefault() ? sEmailAddress.Substring(sEmailAddress.IndexOf("@") + 1).ToLower() : null;
         }
 
         /// <summary>
@@ -298,6 +304,8 @@ namespace CGProCLI
                         oList.Add(((CGProCLI.CGProCLIParser.CliDictionaryContext)oSubObject).ParseDictionary());
                     else if (oSubObject is CGProCLI.CGProCLIParser.CliArrayContext)
                         oList.Add(((CGProCLI.CGProCLIParser.CliArrayContext)oSubObject).ParseArray());
+                    else if (oSubObject is CGProCLI.CGProCLIParser.CliDataBlockContext)
+                        oList.Add(((CGProCLI.CGProCLIParser.CliDataBlockContext)oSubObject).ParseDataBlock());
                     else if (oSubObject is CGProCLI.CGProCLIParser.CliStringContext)
                         oList.Add(DecodeString(oTree.GetText()));
                     else
@@ -348,6 +356,8 @@ namespace CGProCLI
                         oValue = ((CGProCLI.CGProCLIParser.CliDictionaryContext)oSubObject).ParseDictionary();
                     else if (oSubObject is CGProCLI.CGProCLIParser.CliArrayContext)
                         oValue = ((CGProCLI.CGProCLIParser.CliArrayContext)oSubObject).ParseArray();
+                    else if (oSubObject is CGProCLI.CGProCLIParser.CliDataBlockContext)
+                        oValue = ((CGProCLI.CGProCLIParser.CliDataBlockContext)oSubObject).ParseDataBlock();
                     else if (oSubObject is CGProCLI.CGProCLIParser.CliStringContext)
                         oValue = DecodeString(oTree.GetText());
                     else
@@ -368,9 +378,19 @@ namespace CGProCLI
             return oDictionary;
         }
 
+        public static object ParseDataBlock(this CGProCLI.CGProCLIParser.CliDataBlockContext oCLIDataBlock)
+        {
+            var sBase64 = Regex.Replace(oCLIDataBlock.GetText(), @"[^A-Za-z0-9\+\/\=]", "");
+            return Convert.FromBase64String(sBase64);
+        }
+
         public static string EncodeObject(this object o)
         {
-            if (o is IDictionary)
+            if (o is byte[])
+            {
+                return $"[{System.Convert.ToBase64String((byte[])o, Base64FormattingOptions.None)}]";
+            }
+            else if(o is IDictionary)
             {
                 return EncodeDictionary(o as IDictionary);
             }
@@ -378,7 +398,7 @@ namespace CGProCLI
             {
                 return EncodeArray(o as IEnumerable);
             }
-            else
+            else 
             {
                 return o?.ToString().CLIEncode();
             }
