@@ -1,5 +1,5 @@
 # CGProCLIStandard
-## A C# .NET Standard library to manages connections to the MailSPEC Communigate Pro API server via the CLI/PWD interface
+## A C# .NET Standard library to manage connections to the MailSPEC Communigate Pro API server via the CLI/PWD interface
 by Jordan Rieger  
 Software Development Manager  
 Webnames.ca Inc.  
